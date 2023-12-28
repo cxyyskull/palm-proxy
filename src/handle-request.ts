@@ -15,8 +15,8 @@ const pickHeaders = (headers: Headers, keys: (string | RegExp)[]): Headers => {
 
 const CORS_HEADERS: Record<string, string> = {
   "access-control-allow-origin": "*",
-  "access-control-allow-methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "access-control-allow-headers": "Content-Type",
+  "access-control-allow-methods": "*",
+  "access-control-allow-headers": "*",
 };
 
 export default async function handleRequest(request: NextRequest & { nextUrl?: URL }) {
@@ -28,6 +28,33 @@ export default async function handleRequest(request: NextRequest & { nextUrl?: U
 
   const { pathname, searchParams } = request.nextUrl ? request.nextUrl : new URL(request.url);
 
+  if(pathname === "/") {
+    let blank_html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Google PaLM API proxy on Vercel Edge</title>
+</head>
+<body>
+  <h1 id="google-palm-api-proxy-on-vercel-edge">Google PaLM API proxy on Vercel Edge</h1>
+  <p>Tips: This project uses a reverse proxy to solve problems such as location restrictions in Google APIs. </p>
+  <p>If you have any of the following requirements, you may need the support of this project.</p>
+  <ol>
+  <li>When you see the error message &quot;User location is not supported for the API use&quot; when calling the Google PaLM API</li>
+  <li>You want to customize the Google PaLM API</li>
+  </ol>
+  <p>For technical discussions, please visit <a href="https://simonmy.com/posts/使用vercel反向代理google-palm-api.html">https://simonmy.com/posts/使用vercel反向代理google-palm-api.html</a></p>
+</body>
+</html>
+    `
+    return new Response(blank_html, {
+      headers: {
+        ...CORS_HEADERS,
+        "content-type": "text/html"
+      },
+    });
+  }
   // curl \
   // -H 'Content-Type: application/json' \
   // -d '{ "prompt": { "text": "Write a story about a magic backpack"} }' \
@@ -40,7 +67,7 @@ export default async function handleRequest(request: NextRequest & { nextUrl?: U
     url.searchParams.append(key, value);
   });
 
-  const headers = pickHeaders(request.headers, ["content-type"]);
+  const headers = pickHeaders(request.headers, ["content-type", "x-goog-api-client", "x-goog-api-key"]);
 
   const response = await fetch(url, {
     body: request.body,
@@ -50,9 +77,7 @@ export default async function handleRequest(request: NextRequest & { nextUrl?: U
 
   const responseHeaders = {
     ...CORS_HEADERS,
-    ...Object.fromEntries(
-      pickHeaders(response.headers, ["content-type"])
-    ),
+    ...Object.fromEntries(response.headers)
   };
 
   return new Response(response.body, {
